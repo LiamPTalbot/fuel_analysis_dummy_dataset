@@ -1,117 +1,146 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
 import os
+from datetime import datetime, timedelta
 
-# Set a random seed for reproducibility
-np.random.seed(42)
+# Define ship and fuel tank options
+ships = ['QNLZ', 'PWLS']
+fuel_tanks = ['FWD DG RU', 'AFT DG RU']
 
-# Generate the original random data for Water content and time until failure
-water_content = np.random.uniform(1, 100, 500)
-time_until_failure = (3000 / water_content) + np.random.normal(0, 50, size=water_content.shape)
+# Date range for the dataset (from Jan 2021 to Oct 2024, monthly data)
+start_date = datetime(2021, 1, 1)
+end_date = datetime(2024, 10, 1)
+date_range = pd.date_range(start=start_date, end=end_date, freq='MS')  # Month start frequency
 
-# Create DataFrame with the original columns
-data = pd.DataFrame({
-    'Water Content (ppm)': water_content,
-    'Time Until Failure (hours)': time_until_failure
-})
+# Function to gradually degrade values
+def gradual_degrade(start_value, months, drift=0.01, noise=0.005):
+    return np.clip([start_value - (i * drift) + np.random.normal(0, noise) for i in range(months)], 0, None)
 
-# Add 'Ship Name' and 'Fuel Tank' columns
-data['Ship Name'] = 'HMS NONSUCH'
-data['Fuel Tank'] = np.random.choice(['Fuel Tank 1', 'Fuel Tank 2', 'Fuel Tank 3', 'Fuel Tank 4'], size=len(data))
+# Normal ranges for fuel quality measurements
+density_range = (800, 820)  # kg/m3
+water_reaction_range = (0.5, 2.5)  # ml
+flash_point_range = (60, 70)  # Celsius
+filter_block_range = (1.0, 3.0)  # Filter Blocking Tendency
+cloud_point_range = (-10, 5)  # Celsius
+sulphur_range = (0.05, 0.3)  # Sulphur %
+cfu_range = (10, 100)  # Colony Forming Units per ml
+water_content_range = (50, 200)  # mg/kg
 
-# Add a 'Date' column for when the sample was taken
-start_date = datetime.now() - timedelta(days=30)  # Start date 30 days ago
-dates = [start_date + timedelta(days=np.random.randint(0, 30)) for _ in range(len(data))]  # Random date within the last 30 days
-data['Date'] = [d.date() for d in pd.to_datetime(dates)]  # Convert to date format (YYYY-MM-DD)
+# Function to generate failure time based on fuel quality
+def generate_failure_time(fuel_quality):
+    cfu = max(fuel_quality['Colony Forming Units (CFU/ml)'], 1)  # Avoid zero CFU
+    water_content = max(fuel_quality['Water content (mg/kg)'], 1)  # Avoid zero water content
+    filter_block = max(fuel_quality['Filter Blocking Tendency'], 1)  # Avoid zero filter block
+    
+    # Base failure time (10,000 hours for good fuel)
+    base_failure_time = 10000
+    degradation_factor = ((cfu / 100) + (water_content / 200) + filter_block / 3) * np.random.uniform(0.8, 1.2)
+    
+    # Failure time reduces with bad quality
+    time_til_failure = max(200, base_failure_time / degradation_factor)
+    
+    return round(time_til_failure, 2)
 
-# Round water content and time until failure to 2 significant figures
-data['Water Content (ppm)'] = np.round(data['Water Content (ppm)'], 2)
-data['Time Until Failure (hours)'] = np.round(data['Time Until Failure (hours)'], 2)
+# Generate the dataset
+data = []
+for ship in ships:
+    for fuel_tank in fuel_tanks:
+        # Initialize starting points for each ship and fuel tank
+        density = np.random.uniform(*density_range)
+        water_reaction = np.random.uniform(*water_reaction_range)
+        flash_point = np.random.uniform(*flash_point_range)
+        filter_block = np.random.uniform(*filter_block_range)
+        cloud_point = np.random.uniform(*cloud_point_range)
+        sulphur = np.random.uniform(*sulphur_range)
+        cfu = np.random.uniform(*cfu_range)
+        water_content = np.random.uniform(*water_content_range)
+        
+        # Introduce gradual degradation
+        density_vals = gradual_degrade(density, len(date_range), drift=0.5)
+        water_reaction_vals = gradual_degrade(water_reaction, len(date_range), drift=0.1)
+        flash_point_vals = gradual_degrade(flash_point, len(date_range), drift=0.5)
+        filter_block_vals = gradual_degrade(filter_block, len(date_range), drift=0.2)
+        cloud_point_vals = gradual_degrade(cloud_point, len(date_range), drift=0.2)
+        sulphur_vals = gradual_degrade(sulphur, len(date_range), drift=0.01)
+        cfu_vals = gradual_degrade(cfu, len(date_range), drift=5)
+        water_content_vals = gradual_degrade(water_content, len(date_range), drift=10)
+        
+        # Occasionally reset the values to simulate cleaning the fuel tank
+        reset_points = np.random.choice(range(len(date_range)), size=3, replace=False)
+        for rp in reset_points:
+            density_vals[rp] = np.random.uniform(*density_range)
+            water_reaction_vals[rp] = np.random.uniform(*water_reaction_range)
+            flash_point_vals[rp] = np.random.uniform(*flash_point_range)
+            filter_block_vals[rp] = np.random.uniform(*filter_block_range)
+            cloud_point_vals[rp] = np.random.uniform(*cloud_point_range)
+            sulphur_vals[rp] = np.random.uniform(*sulphur_range)
+            cfu_vals[rp] = np.random.uniform(*cfu_range)
+            water_content_vals[rp] = np.random.uniform(*water_content_range)
 
-# Define engine IDs and names
-engine_mapping = {
-    'Engine 1': 'ENG1001',
-    'Engine 2': 'ENG1002',
-    'Engine 3': 'ENG1003',
-    'Engine 4': 'ENG1004'
-}
+        # Create rows for each month
+        for i, date in enumerate(date_range):
+            data.append([
+                ship, fuel_tank, date.strftime('%Y-%m-%d'), 
+                round(density_vals[i], 2), 
+                round(water_reaction_vals[i], 2), 
+                round(flash_point_vals[i], 2), 
+                round(filter_block_vals[i], 2), 
+                round(cloud_point_vals[i], 2), 
+                round(sulphur_vals[i], 3), 
+                round(cfu_vals[i], 2), 
+                round(water_content_vals[i], 2)
+            ])
 
-# Generate random failure reports for 4 engines corresponding to 4 fuel tanks
-num_reports = 10
-failure_reports = []
+# Create DataFrame
+columns = ['Ship', 'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 
+           'Flash Point (celsius)', 'Filter Blocking Tendency', 'Cloud Point (celsius)', 
+           'Sulphur (%)', 'Colony Forming Units (CFU/ml)', 'Water content (mg/kg)']
 
-for _ in range(num_reports):
-    # Randomly select an engine (and its corresponding fuel tank)
-    engine_index = np.random.randint(0, 4)  # Select engine index from 0 to 3
-    engine_name = f'Engine {engine_index + 1}'
-    fuel_tank = f'Fuel Tank {engine_index + 1}'
-    engine_id = engine_mapping[engine_name]
+df = pd.DataFrame(data, columns=columns)
 
-    # Generate random time until failure and failure date
-    time_until_failure = np.random.uniform(50, 3000)  # Random time until failure between 50 and 3000 hours
-    failure_date = (datetime.now() - timedelta(hours=time_until_failure)).date()  # Failure date
+# Generate failure data
+failure_data = []
 
-    # Append the report to the list, ensuring time until failure is non-negative
-    failure_reports.append({
-        'Engine Name': engine_name,
-        'Engine ID': engine_id,  # Consistent engine ID
-        'Fuel Pump Location': f'Cyl. {np.random.randint(1, 17)}',  # Randomly chosen cylinder from 1 to 16
-        'Fuel Pump Model': "Wartsila",  # Fuel pump model (always Wartsila)
-        'Time Until Failure (hours)': max(0, time_until_failure),  # Ensure non-negative
-        'Date of Failure': failure_date,
-        'Fuel Tank': fuel_tank
+for _, row in df.iterrows():
+    ship = row['Ship']
+    fuel_tank = row['Fuel Tank']
+    
+    # Select engine based on fuel tank
+    if fuel_tank == 'FWD DG RU':
+        engine = np.random.choice(['DG1', 'DG2'])
+        num_pumps = 12
+    else:
+        engine = np.random.choice(['DG3', 'DG4'])
+        num_pumps = 16
+    
+    # Select a random pump from the engine
+    selected_pump = np.random.randint(1, num_pumps)
+    
+    # Generate time til failure based on fuel quality
+    time_til_failure = generate_failure_time(row)
+    
+    # Append the failure data to the dataset
+    failure_data.append({
+        'Ship': ship,
+        'Engine': engine,
+        'Engine ID': f'{ship}_{engine}',
+        'Fuel Pump ID': f'{engine}_Pump_{selected_pump}',
+        'Time Til Failure (hours)': time_til_failure,
+        'Fuel Tank Feed': fuel_tank
     })
 
-# Create a DataFrame from the failure reports
-failure_reports_df = pd.DataFrame(failure_reports)
+# Convert failure data to DataFrame
+failure_df = pd.DataFrame(failure_data)
 
-# Merge the data and failure reports based on 'Fuel Tank' and 'Date'
-merged_data = pd.merge(data, failure_reports_df, left_on=['Fuel Tank', 'Date'], right_on=['Fuel Tank', 'Date of Failure'], how='left')
+# Merge failure data with the original dataset
+merged_df = pd.concat([df.reset_index(drop=True), failure_df.reset_index(drop=True)], axis=1)
 
-# Drop the Time Until Failure_x column, if it exists, to avoid confusion
-if 'Time Until Failure (hours)_x' in merged_data.columns:
-    merged_data.drop(columns=['Time Until Failure (hours)_x'], inplace=True)
+# Create the 'public' folder if it doesn't exist
+if not os.path.exists('public'):
+    os.makedirs('public')
 
-# Rename the water content column to have a suffix
-merged_data.rename(columns={'Water Content (ppm)': 'Water Content (ppm)_x'}, inplace=True)
+# Save to Excel file in the 'public' folder
+output_path = os.path.join('public', 'ship_fuel_analysis_corrected_dates_failures_final.xlsx')
+merged_df.to_excel(output_path, index=False)
 
-# Add a column for Fuel Tank Feed based on Engine Name
-merged_data['Fuel Tank Feed'] = merged_data['Engine Name']
-
-# Rearrange the columns in the specified order
-final_columns = [
-    'Ship Name',
-    'Fuel Tank',
-    'Date',
-    'Water Content (ppm)_x',
-    'Engine Name',
-    'Engine ID',
-    'Fuel Tank Feed',
-    'Fuel Pump Location',
-    'Fuel Pump Model',
-    'Time Until Failure (hours)',  # Ensure this is the correct column
-    'Date of Failure'
-]
-
-# Rename the time until failure column to ensure it matches
-if 'Time Until Failure (hours)_y' in merged_data.columns:
-    merged_data.rename(columns={'Time Until Failure (hours)_y': 'Time Until Failure (hours)'}, inplace=True)
-
-# Reorder the DataFrame to the final column order
-merged_data = merged_data[final_columns]
-
-# Create a timestamp for the filename
-file_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-
-# Define the path to the public directory and ensure it exists
-public_directory = os.path.expanduser('./public')  # Save to the public folder in your home directory
-os.makedirs(public_directory, exist_ok=True)  # Create the directory if it doesn't exist
-
-# Save the merged DataFrame to the public directory
-merged_filename = f'{public_directory}/full_fuel_analysis_with_failures_{file_timestamp}.csv'
-
-# Save the merged data
-merged_data.to_csv(merged_filename, index=False)
-
-print(f'Full dataset with failures saved as {merged_filename}')
+print(f"Dataset saved to: {output_path}")

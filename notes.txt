@@ -1,0 +1,18 @@
+
+What do I want the output to be?
+
+A BIG picture of the engines on that ship with RAG status on each fuel pump.
+Table below it with
+
+|  Ship  | Engine Name | EngineID | Component Name | ComponentID | TTF | 
+
+Time-series of Failures - overlaid with - Time-series of Stock levels
+(You always want to keep the Failure line below the stock level line)
+
+What do i need the input to be?
+
+Fuel Analysis data
+| ship | Fuel Tank | timestamp | water content | 
+
+Fuel Pump data
+| engine name | engine id | fuel pump location | fuel pump model | fuel pump life | date of failure | fuel tank feed | 

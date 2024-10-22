@@ -1,9 +1,8 @@
-import pandas as pd
 import numpy as np
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
+import pandas as pd
 
-# Define ship and fuel tank options
+# Re-define ship and fuel tank options
 ships = ['QNLZ', 'PWLS']
 fuel_tanks = ['FWD DG RU', 'AFT DG RU']
 
@@ -135,12 +134,21 @@ failure_df = pd.DataFrame(failure_data)
 # Merge failure data with the original dataset
 merged_df = pd.concat([df.reset_index(drop=True), failure_df.reset_index(drop=True)], axis=1)
 
-# Create the 'public' folder if it doesn't exist
-if not os.path.exists('public'):
-    os.makedirs('public')
+# Rearrange the columns so that columns L to Q come first
+cols_order = ['Ship', 'Engine', 'Engine ID', 'Fuel Pump ID', 'Time Til Failure (hours)', 'Fuel Tank Feed', 
+              'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 'Flash Point (celsius)', 
+              'Filter Blocking Tendency', 'Cloud Point (celsius)', 'Sulphur (%)', 'Colony Forming Units (CFU/ml)', 
+              'Water content (mg/kg)']
 
-# Save to Excel file in the 'public' folder
-output_path = os.path.join('public', 'ship_fuel_analysis_corrected_dates_failures_final.xlsx')
-merged_df.to_excel(output_path, index=False)
+# Reorder the dataframe
+reordered_df = merged_df[cols_order]
 
-print(f"Dataset saved to: {output_path}")
+# Remove the 'Fuel Tank' column
+reordered_df_without_fuel_tank = reordered_df.drop(columns=['Fuel Tank'])
+
+# Remove the duplicate 'Ship' column
+reordered_df_without_duplicate = reordered_df_without_fuel_tank.loc[:, ~reordered_df_without_fuel_tank.columns.duplicated()]
+
+# Save the updated dataframe without the duplicate 'Ship' column as a CSV file
+csv_without_duplicate_ship_output_path = './public/ship_fuel_analysis.csv'
+reordered_df_without_duplicate.to_csv(csv_without_duplicate_ship_output_path, index=False)

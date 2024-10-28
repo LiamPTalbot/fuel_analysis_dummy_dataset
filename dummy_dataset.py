@@ -35,7 +35,7 @@ def generate_failure_time(fuel_quality):
     
     return round(time_til_failure, 2)
 
-# Generate the dataset
+# Generate the dataset with increased variability
 data = []
 for ship in ships:
     # Generate shared fuel quality baseline for each ship
@@ -49,15 +49,15 @@ for ship in ships:
     base_water_content = np.random.uniform(*water_content_range)
     
     for fuel_tank, engines in fuel_tanks.items():
-        # Add subtle variations between FWD and AFT tanks
-        density = base_density + np.random.normal(0, 0.5)
-        water_reaction = base_water_reaction + np.random.normal(0, 0.1)
-        flash_point = base_flash_point + np.random.normal(0, 0.5)
-        filter_block = base_filter_block + np.random.normal(0, 0.1)
-        cloud_point = base_cloud_point + np.random.normal(0, 0.2)
-        sulphur = base_sulphur + np.random.normal(0, 0.01)
-        cfu = base_cfu + np.random.normal(0, 5)
-        water_content = base_water_content + np.random.normal(0, 10)
+        # Increase subtle variations between FWD and AFT tanks
+        density = base_density + np.random.normal(0, 1)
+        water_reaction = base_water_reaction + np.random.normal(0, 0.15)
+        flash_point = base_flash_point + np.random.normal(0, 1)
+        filter_block = base_filter_block + np.random.normal(0, 0.2)
+        cloud_point = base_cloud_point + np.random.normal(0, 0.5)
+        sulphur = base_sulphur + np.random.normal(0, 0.02)
+        cfu = base_cfu + np.random.normal(0, 10)
+        water_content = base_water_content + np.random.normal(0, 15)
 
         for engine in engines:
             # Determine number of pumps per engine

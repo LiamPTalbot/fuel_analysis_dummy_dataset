@@ -97,58 +97,51 @@ columns = ['Ship', 'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol C
 
 df = pd.DataFrame(data, columns=columns)
 
-# Generate failure data
-failure_data = []
-
+# Generate failure data for all pumps on DG1, DG2 (16 pumps each) and DG3, DG4 (12 pumps each)
+failure_data_complete = []
 for _, row in df.iterrows():
     ship = row['Ship']
     fuel_tank = row['Fuel Tank']
     
-    # Select engine based on fuel tank
+    # Define engines and their pump counts based on fuel tank
     if fuel_tank == 'FWD DG RU':
-        engine = np.random.choice(['DG1', 'DG2'])
-        num_pumps = 12
+        engines = {'DG1': 16, 'DG2': 16}  # DG1 and DG2 each have 16 pumps
     else:
-        engine = np.random.choice(['DG3', 'DG4'])
-        num_pumps = 16
+        engines = {'DG3': 12, 'DG4': 12}  # DG3 and DG4 each have 12 pumps
     
-    # Select a random pump from the engine
-    selected_pump = np.random.randint(1, num_pumps)
-    
-    # Generate time til failure based on fuel quality
-    time_til_failure = generate_failure_time(row)
-    
-    # Append the failure data to the dataset
-    failure_data.append({
-        'Ship': ship,
-        'Engine': engine,
-        'Engine ID': f'{ship}_{engine}',
-        'Fuel Pump ID': f'{engine}_Pump_{selected_pump}',
-        'Time Til Failure (hours)': time_til_failure,
-        'Fuel Tank Feed': fuel_tank
-    })
+    # Generate data for each engine and all pumps in that engine
+    for engine, num_pumps in engines.items():
+        for pump_num in range(1, num_pumps + 1):
+            # Generate time til failure based on fuel quality
+            time_til_failure = generate_failure_time(row)
+            
+            # Append the detailed failure data to the dataset
+            failure_data_complete.append({
+                'Ship': ship,
+                'Engine': engine,
+                'Engine ID': f'{ship}_{engine}',
+                'Fuel Pump ID': f'{engine}_Pump_{pump_num}',
+                'Time Til Failure (hours)': time_til_failure,
+                'Fuel Tank Feed': fuel_tank
+            })
 
-# Convert failure data to DataFrame
-failure_df = pd.DataFrame(failure_data)
+# Convert the complete failure data to a DataFrame
+failure_df_complete = pd.DataFrame(failure_data_complete)
 
-# Merge failure data with the original dataset
-merged_df = pd.concat([df.reset_index(drop=True), failure_df.reset_index(drop=True)], axis=1)
+# Merge the failure data with the original dataset
+merged_df_complete = pd.concat([df.reset_index(drop=True), failure_df_complete.reset_index(drop=True)], axis=1)
 
-# Rearrange the columns so that columns L to Q come first
-cols_order = ['Ship', 'Engine', 'Engine ID', 'Fuel Pump ID', 'Time Til Failure (hours)', 'Fuel Tank Feed', 
-              'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 'Flash Point (celsius)', 
-              'Filter Blocking Tendency', 'Cloud Point (celsius)', 'Sulphur (%)', 'Colony Forming Units (CFU/ml)', 
-              'Water content (mg/kg)']
+# Reorder columns as specified
+cols_order_complete = ['Ship', 'Engine', 'Engine ID', 'Fuel Pump ID', 'Time Til Failure (hours)', 'Fuel Tank Feed', 
+                       'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 'Flash Point (celsius)', 
+                       'Filter Blocking Tendency', 'Cloud Point (celsius)', 'Sulphur (%)', 
+                       'Colony Forming Units (CFU/ml)', 'Water content (mg/kg)']
 
-# Reorder the dataframe
-reordered_df = merged_df[cols_order]
+# Reorder the dataframe according to specified column order
+reordered_df_complete = merged_df_complete[cols_order_complete]
 
-# Remove the 'Fuel Tank' column
-reordered_df_without_fuel_tank = reordered_df.drop(columns=['Fuel Tank'])
+# Remove the 'Fuel Tank' column and save to CSV
+csv_output_path_complete = './complete_ship_fuel_analysis.csv'
+reordered_df_complete.to_csv(csv_output_path_complete, index=False)
 
-# Remove the duplicate 'Ship' column
-reordered_df_without_duplicate = reordered_df_without_fuel_tank.loc[:, ~reordered_df_without_fuel_tank.columns.duplicated()]
-
-# Save the updated dataframe without the duplicate 'Ship' column as a CSV file
-csv_without_duplicate_ship_output_path = './public/ship_fuel_analysis.csv'
-reordered_df_without_duplicate.to_csv(csv_without_duplicate_ship_output_path, index=False)
+print(f"Data has been saved to {csv_output_path_complete}")

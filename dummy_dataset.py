@@ -2,9 +2,9 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 
-# Re-define ship and fuel tank options
+# Define ship and fuel tank options
 ships = ['QNLZ', 'PWLS']
-fuel_tanks = ['FWD DG RU', 'AFT DG RU']
+fuel_tanks = {'FWD DG RU': ['DG1', 'DG2'], 'AFT DG RU': ['DG3', 'DG4']}
 
 # Date range for the dataset (from Jan 2021 to Oct 2024, monthly data)
 start_date = datetime(2021, 1, 1)
@@ -42,8 +42,12 @@ def generate_failure_time(fuel_quality):
 
 # Generate the dataset
 data = []
+cumulative_hours = {ship: {engine: {pump: 0 for pump in range(1, 17)} if engine in ['DG1', 'DG2'] else {pump: 0 for pump in range(1, 13)}
+                            for engine in ['DG1', 'DG2', 'DG3', 'DG4']}
+                    for ship in ships}
+
 for ship in ships:
-    for fuel_tank in fuel_tanks:
+    for fuel_tank, engines in fuel_tanks.items():
         # Initialize starting points for each ship and fuel tank
         density = np.random.uniform(*density_range)
         water_reaction = np.random.uniform(*water_reaction_range)
@@ -76,72 +80,50 @@ for ship in ships:
             cfu_vals[rp] = np.random.uniform(*cfu_range)
             water_content_vals[rp] = np.random.uniform(*water_content_range)
 
-        # Create rows for each month
+        # Create rows for each month and engine
         for i, date in enumerate(date_range):
-            data.append([
-                ship, fuel_tank, date.strftime('%Y-%m-%d'), 
-                round(density_vals[i], 2), 
-                round(water_reaction_vals[i], 2), 
-                round(flash_point_vals[i], 2), 
-                round(filter_block_vals[i], 2), 
-                round(cloud_point_vals[i], 2), 
-                round(sulphur_vals[i], 3), 
-                round(cfu_vals[i], 2), 
-                round(water_content_vals[i], 2)
-            ])
+            for engine in engines:
+                # Determine number of pumps based on engine
+                num_pumps = 16 if engine in ['DG1', 'DG2'] else 12
+                for pump_num in range(1, num_pumps + 1):
+                    # Update cumulative hours
+                    fuel_quality = {
+                        'Colony Forming Units (CFU/ml)': cfu_vals[i],
+                        'Water content (mg/kg)': water_content_vals[i],
+                        'Filter Blocking Tendency': filter_block_vals[i]
+                    }
+                    if cumulative_hours[ship][engine][pump_num] == 0 or cumulative_hours[ship][engine][pump_num] >= generate_failure_time(fuel_quality):
+                        # Reset failure time on reaching limit
+                        time_til_failure = generate_failure_time(fuel_quality)
+                        cumulative_hours[ship][engine][pump_num] = 0  # Simulate maintenance/reset on failure
+                    else:
+                        time_til_failure = None  # No failure this month
+                    
+                    cumulative_hours[ship][engine][pump_num] += 730  # 730 hours per month on average
+
+                    data.append([
+                        ship, engine, f'{ship}_{engine}', f'{engine}_Pump_{pump_num}', time_til_failure,
+                        fuel_tank, date.strftime('%Y-%m-%d'), 
+                        round(density_vals[i], 2), 
+                        round(water_reaction_vals[i], 2), 
+                        round(flash_point_vals[i], 2), 
+                        round(filter_block_vals[i], 2), 
+                        round(cloud_point_vals[i], 2), 
+                        round(sulphur_vals[i], 3), 
+                        round(cfu_vals[i], 2), 
+                        round(water_content_vals[i], 2)
+                    ])
 
 # Create DataFrame
-columns = ['Ship', 'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 
-           'Flash Point (celsius)', 'Filter Blocking Tendency', 'Cloud Point (celsius)', 
-           'Sulphur (%)', 'Colony Forming Units (CFU/ml)', 'Water content (mg/kg)']
+columns = ['Ship', 'Engine', 'Engine ID', 'Fuel Pump ID', 'Time Til Failure (hours)', 'Fuel Tank Feed', 'Date', 
+           'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 'Flash Point (celsius)', 
+           'Filter Blocking Tendency', 'Cloud Point (celsius)', 'Sulphur (%)', 
+           'Colony Forming Units (CFU/ml)', 'Water content (mg/kg)']
 
-df = pd.DataFrame(data, columns=columns)
+df_complete = pd.DataFrame(data, columns=columns)
 
-# Generate failure data for all pumps on DG1, DG2 (16 pumps each) and DG3, DG4 (12 pumps each)
-failure_data_complete = []
-for _, row in df.iterrows():
-    ship = row['Ship']
-    fuel_tank = row['Fuel Tank']
-    
-    # Define engines and their pump counts based on fuel tank
-    if fuel_tank == 'FWD DG RU':
-        engines = {'DG1': 16, 'DG2': 16}  # DG1 and DG2 each have 16 pumps
-    else:
-        engines = {'DG3': 12, 'DG4': 12}  # DG3 and DG4 each have 12 pumps
-    
-    # Generate data for each engine and all pumps in that engine
-    for engine, num_pumps in engines.items():
-        for pump_num in range(1, num_pumps + 1):
-            # Generate time til failure based on fuel quality
-            time_til_failure = generate_failure_time(row)
-            
-            # Append the detailed failure data to the dataset
-            failure_data_complete.append({
-                'Ship': ship,
-                'Engine': engine,
-                'Engine ID': f'{ship}_{engine}',
-                'Fuel Pump ID': f'{engine}_Pump_{pump_num}',
-                'Time Til Failure (hours)': time_til_failure,
-                'Fuel Tank Feed': fuel_tank
-            })
-
-# Convert the complete failure data to a DataFrame
-failure_df_complete = pd.DataFrame(failure_data_complete)
-
-# Merge the failure data with the original dataset
-merged_df_complete = pd.concat([df.reset_index(drop=True), failure_df_complete.reset_index(drop=True)], axis=1)
-
-# Reorder columns as specified
-cols_order_complete = ['Ship', 'Engine', 'Engine ID', 'Fuel Pump ID', 'Time Til Failure (hours)', 'Fuel Tank Feed', 
-                       'Fuel Tank', 'Date', 'Density (kg/m3)', 'Water Reaction Vol Change (ml)', 'Flash Point (celsius)', 
-                       'Filter Blocking Tendency', 'Cloud Point (celsius)', 'Sulphur (%)', 
-                       'Colony Forming Units (CFU/ml)', 'Water content (mg/kg)']
-
-# Reorder the dataframe according to specified column order
-reordered_df_complete = merged_df_complete[cols_order_complete]
-
-# Remove the 'Fuel Tank' column and save to CSV
+# Save to CSV
 csv_output_path_complete = './complete_ship_fuel_analysis.csv'
-reordered_df_complete.to_csv(csv_output_path_complete, index=False)
+df_complete.to_csv(csv_output_path_complete, index=False)
 
 print(f"Data has been saved to {csv_output_path_complete}")

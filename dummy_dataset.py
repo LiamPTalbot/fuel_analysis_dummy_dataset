@@ -38,25 +38,35 @@ def generate_failure_time(fuel_quality):
 # Generate the dataset
 data = []
 for ship in ships:
+    # Generate shared fuel quality baseline for each ship
+    base_density = np.random.uniform(*density_range)
+    base_water_reaction = np.random.uniform(*water_reaction_range)
+    base_flash_point = np.random.uniform(*flash_point_range)
+    base_filter_block = np.random.uniform(*filter_block_range)
+    base_cloud_point = np.random.uniform(*cloud_point_range)
+    base_sulphur = np.random.uniform(*sulphur_range)
+    base_cfu = np.random.uniform(*cfu_range)
+    base_water_content = np.random.uniform(*water_content_range)
+    
     for fuel_tank, engines in fuel_tanks.items():
+        # Add subtle variations between FWD and AFT tanks
+        density = base_density + np.random.normal(0, 0.5)
+        water_reaction = base_water_reaction + np.random.normal(0, 0.1)
+        flash_point = base_flash_point + np.random.normal(0, 0.5)
+        filter_block = base_filter_block + np.random.normal(0, 0.1)
+        cloud_point = base_cloud_point + np.random.normal(0, 0.2)
+        sulphur = base_sulphur + np.random.normal(0, 0.01)
+        cfu = base_cfu + np.random.normal(0, 5)
+        water_content = base_water_content + np.random.normal(0, 10)
+
         for engine in engines:
-            # Set number of pumps per engine
+            # Determine number of pumps per engine
             num_pumps = 16 if engine in ['DG1', 'DG2'] else 12
             for pump_num in range(1, num_pumps + 1):
                 # Initialize failure tracking for each pump
                 current_date = start_date
-                
-                while current_date < end_date:
-                    # Randomly generate initial fuel quality values
-                    density = np.random.uniform(*density_range)
-                    water_reaction = np.random.uniform(*water_reaction_range)
-                    flash_point = np.random.uniform(*flash_point_range)
-                    filter_block = np.random.uniform(*filter_block_range)
-                    cloud_point = np.random.uniform(*cloud_point_range)
-                    sulphur = np.random.uniform(*sulphur_range)
-                    cfu = np.random.uniform(*cfu_range)
-                    water_content = np.random.uniform(*water_content_range)
 
+                while current_date < end_date:
                     # Pack fuel quality data into dictionary
                     fuel_quality = {
                         'Colony Forming Units (CFU/ml)': cfu,

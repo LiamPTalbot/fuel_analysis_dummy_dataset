@@ -57,9 +57,15 @@ for ship in ships:
     
     for fuel_tank, engines in fuel_tanks.items():
         for engine in engines:
-            # Determine number of pumps per engine
-            num_pumps = 16 if engine in ['DG1', 'DG2'] else 12
+            # Determine number of pumps per engine based on corrected engine assignment
+            num_pumps = 12 if engine in ['DG1', 'DG2'] else 16
+            
             for pump_num in range(1, num_pumps + 1):
+                # Determine the bank and correct pump numbering format
+                bank = 'A' if pump_num <= (num_pumps // 2) else 'B'
+                bank_pump_num = pump_num if bank == 'A' else pump_num - (num_pumps // 2)
+                fuel_pump_id = f"{engine}_Pump_{bank}{bank_pump_num}"
+                
                 current_date = start_date
                 fuel_quality = reset_fuel_quality(base_values)  # Initial refuel
 
@@ -83,7 +89,7 @@ for ship in ships:
                     if failure_date <= end_date:
                         # Append failure report data to dataset
                         data.append([
-                            ship, engine, f'{ship}_{engine}', f'{engine}_Pump_{pump_num}', time_til_failure,
+                            ship, engine, f'{ship}_{engine}', fuel_pump_id, time_til_failure,
                             fuel_tank, failure_date.strftime('%Y-%m-%d'), 
                             round(fuel_quality['Density'], 2), 
                             round(fuel_quality['Water Reaction Vol Change'], 2), 

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # Define ships, engines, and fuel tank mappings
-ships = ['QNLZ', 'PWLS']
+ships = ['QNLZ', 'PWLS', 'CARDIB', 'MOUNTS', 'LYME']
 fuel_tanks = {'FWD DG RU': ['DG1', 'DG2'], 'AFT DG RU': ['DG3', 'DG4']}
 
 # Time frame for the dataset
@@ -57,14 +57,26 @@ for ship in ships:
     
     for fuel_tank, engines in fuel_tanks.items():
         for engine in engines:
-            # Determine number of pumps per engine based on corrected engine assignment
-            num_pumps = 12 if engine in ['DG1', 'DG2'] else 16
+            # Determine number of pumps per engine based on the ship and engine combination
+            if ship in ['CARDIB', 'MOUNTS', 'LYME']:
+                if engine in ['DG1', 'DG2']:
+                    num_pumps = 8  # A1 to A8
+                elif engine in ['DG3', 'DG4']:
+                    num_pumps = 12  # A1 to A6 and B1 to B6
+                else:
+                    num_pumps = 0  # Safety fallback
+            else:
+                num_pumps = 12 if engine in ['DG1', 'DG2'] else 16  # Default for other ships
             
             for pump_num in range(1, num_pumps + 1):
-                # Determine the bank and correct pump numbering format
-                bank = 'A' if pump_num <= (num_pumps // 2) else 'B'
-                bank_pump_num = pump_num if bank == 'A' else pump_num - (num_pumps // 2)
-                fuel_pump_id = f"{engine}_Pump_{bank}{bank_pump_num}"
+                # Correct labeling for CARDIB, MOUNTS, LYME, DG1/DG2 (A1 to A8)
+                if ship in ['CARDIB', 'MOUNTS', 'LYME'] and engine in ['DG1', 'DG2']:
+                    fuel_pump_id = f"{engine}_Pump_A{pump_num}"
+                else:
+                    # Default labeling logic for other cases
+                    bank = 'A' if pump_num <= (num_pumps // 2) else 'B'
+                    bank_pump_num = pump_num if bank == 'A' else pump_num - (num_pumps // 2)
+                    fuel_pump_id = f"{engine}_Pump_{bank}{bank_pump_num}"
                 
                 current_date = start_date
                 fuel_quality = reset_fuel_quality(base_values)  # Initial refuel
